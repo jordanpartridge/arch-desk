@@ -15,7 +15,7 @@ import { isIP } from "net";
 import { Database } from "bun:sqlite";
 import { localDayIndex, localDayStarts } from "./history-time";
 import { githubFetchEnabled, githubRefreshDue, githubRepoFromRemote, githubSnapshot, parseGithubStoreText, refreshGithubActivity } from "./github-activity";
-import { attentionSignal, parseCommitSummary, parseDiffNumstat, parseGitStatus, projectHealth, repoCollisions, workspaceGroups, resourceDelta, limitForecast } from "./ai-ops";
+import { attentionSignal, parseCommitSummary, parseDiffNumstat, parseGitStatus, projectHealth, repoCollisions, workspaceGroups, resourceDelta, limitForecast, thinkBoard } from "./ai-ops";
 import { deriveNotificationEvents } from "./notification-events";
 
 const HOME = process.env.HOME || "/root";
@@ -2362,36 +2362,36 @@ function demoSnapshot(stamp = Date.now()) {
   const github = { state: "ok", login: "demo", fetchedAt: stamp - 90_000, coverage: "complete", coveredFrom: dayStarts[0], error: "", days: dayStarts, cells: githubCells, counts: githubCounts };
   const sessions = [
     {
-      provider: "codex", pid: 42421, cwd: "~/Code/atlas", project: "atlas", startedAt: stamp - 38 * 60_000,
+      provider: "codex", pid: 42421, cwd: "~/Work/die/asgard-260-crew", project: "asgard-260-crew", name: "asgard-260-crew", startedAt: stamp - 38 * 60_000,
       uptimeSec: 38 * 60, session: "demo-codex-session", sessionIds: ["demo-codex-session"], busy: true,
       topic: "Hardening atomic state persistence", topicAt: stamp - 90_000,
       window: { address: "0xd001", title: "Implementing bounded snapshot transport", class: "com.mitchellh.ghostty", workspace: 2 },
       resources: { cpuPct: 18.4, rss: 912_261_120, processes: 7, gpuMemory: null },
-      repoRoot: "~/Code/atlas", git: { branch: "release/dashboard", dirty: 4, staged: 1, untracked: 1, files: ["collector.ts", "InfoView.qml", "tests/dashboard.test.ts", "README.md"], ahead: 2, behind: 0, conflicts: 0 }, attention: "",
+      repoRoot: "~/Work/die/asgard-260-crew", git: { branch: "release/dashboard", dirty: 4, staged: 1, untracked: 1, files: ["collector.ts", "InfoView.qml", "tests/dashboard.test.ts", "README.md"], ahead: 2, behind: 0, conflicts: 0 }, attention: "",
       attentionReason: "", attentionAction: "", attentionDetail: "",
       hosts: [{ kind: "tmux", label: "tmux build:2.0", session: "build", window: "2", pane: "0", paneId: "%4", attached: true }],
       changes: { fingerprint: "atlas-demo-2", count: 4, staged: 1, untracked: 1, files: ["collector.ts", "InfoView.qml", "tests/dashboard.test.ts", "README.md"], testFiles: 1, additions: 186, deletions: 24, head: "a11a5d00", headShort: "a11a5d0", commitSubject: "feat: add operations intelligence", committedAt: stamp - 12 * 60_000 },
       ci: { state: "in_progress", name: "test", headSha: "a11a5d00", updatedAt: new Date(stamp - 2 * 60_000).toISOString(), checkedAt: stamp },
     },
     {
-      provider: "claude", pid: 42463, cwd: "~/Code/orbit", project: "orbit", startedAt: stamp - 74 * 60_000,
+      provider: "claude", pid: 42463, cwd: "~/Projects/synapse-sentinel/lexi", project: "lexi", startedAt: stamp - 74 * 60_000,
       uptimeSec: 74 * 60, session: "demo-claude-session", sessionIds: ["demo-claude-session"], busy: false,
       topic: "Reviewing plugin submission checks", topicAt: stamp - 4 * 60_000,
       window: { address: "0xd002", title: "Waiting for marketplace review", class: "kitty", workspace: 4 },
       resources: { cpuPct: 2.1, rss: 604_241_920, processes: 5, gpuMemory: null },
-      repoRoot: "~/Code/orbit", git: { branch: "main", dirty: 0, staged: 0, untracked: 0, files: [], ahead: 0, behind: 0, conflicts: 0 }, attention: "waiting",
+      repoRoot: "~/Projects/synapse-sentinel/lexi", git: { branch: "main", dirty: 0, staged: 0, untracked: 0, files: [], ahead: 0, behind: 0, conflicts: 0 }, attention: "waiting",
       attentionReason: "waiting for your permission", attentionAction: "answer", attentionDetail: "Waiting for marketplace review approval",
       hosts: [{ kind: "boomux", label: "Boomux release / reviewer", workspace: "release", shell: "reviewer", shellId: "demo-boomux-shell", runId: "demo-boomux-run" }],
       changes: { fingerprint: "orbit-demo-1", count: 0, staged: 0, untracked: 0, files: [], testFiles: 0, additions: 0, deletions: 0, head: "0b17cafe", headShort: "0b17caf", commitSubject: "security: pass marketplace review", committedAt: stamp - 48 * 60_000 },
       ci: { state: "success", name: "validate", headSha: "0b17cafe", updatedAt: new Date(stamp - 44 * 60_000).toISOString(), checkedAt: stamp },
     },
     {
-      provider: "opencode", pid: 42511, cwd: "~/Code/beacon", project: "beacon", startedAt: stamp - 16 * 60_000,
+      provider: "opencode", pid: 42511, cwd: "~/Projects/the-shit/kit", project: "kit", startedAt: stamp - 16 * 60_000,
       uptimeSec: 16 * 60, session: "demo-opencode-session", sessionIds: ["demo-opencode-session"], busy: true,
       topic: "Building interactive model controls", topicAt: stamp - 45_000,
       window: { address: "0xd003", title: "Local AI model controls", class: "Alacritty", workspace: 6 },
       resources: { cpuPct: 9.7, rss: 486_539_264, processes: 4, gpuMemory: 1_288_490_188 },
-      repoRoot: "~/Code/beacon", git: { branch: "feat/local-ai", dirty: 2, staged: 0, untracked: 1, files: ["LocalAi.qml", "local-ai.test.ts"], ahead: 1, behind: 0, conflicts: 0 }, attention: "",
+      repoRoot: "~/Projects/the-shit/kit", git: { branch: "feat/local-ai", dirty: 2, staged: 0, untracked: 1, files: ["LocalAi.qml", "local-ai.test.ts"], ahead: 1, behind: 0, conflicts: 0 }, attention: "",
       attentionReason: "", attentionAction: "", attentionDetail: "",
       hosts: [{ kind: "herdr", label: "Herdr w2 / w2:t3 / w2:p7", workspaceId: "w2", tabId: "w2:t3", paneId: "w2:p7" }],
       changes: { fingerprint: "beacon-demo-3", count: 2, staged: 0, untracked: 1, files: ["LocalAi.qml", "local-ai.test.ts"], testFiles: 1, additions: 94, deletions: 8, head: "bea00ace", headShort: "bea00ac", commitSubject: "feat: control local models", committedAt: stamp - 35 * 60_000 },
@@ -2428,7 +2428,7 @@ function demoSnapshot(stamp = Date.now()) {
       temp: 52, uptime: 186_300, externalIp: "203.0.113.42",
     },
     ai: {
-      sessions, projects: projectHealth(sessions), workspaces: workspaceGroups(sessions), attention: [sessions[1]], collisions: [],
+      sessions, think: thinkBoard(sessions), projects: projectHealth(sessions), workspaces: workspaceGroups(sessions), attention: [sessions[1]], collisions: [],
       counts: { claude: { today: 18, week: 96, total: 640 }, codex: { today: 27, week: 144, total: 1102 }, opencode: { today: 11, week: 51, total: 214 } },
       providers: {
         claude: { present: true, prompts: 640 }, codex: { present: true, prompts: 1102, threadCount: 37 },
@@ -2486,6 +2486,7 @@ async function runCollector() {
     },
     ai: {
       sessions,
+      think: thinkBoard(sessions),
       projects: projectHealth(sessions),
       workspaces: workspaceGroups(sessions),
       attention: sessions.filter((s: any) => s.attention),

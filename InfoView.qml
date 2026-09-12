@@ -82,6 +82,7 @@ Item {
   property string promptSearch: ""
   property string expandedChangeKey: ""
   property string projectFilter: ""
+  property string thinkFilter: ""
   signal navigated()
 
   function navigateTo(address) {
@@ -120,8 +121,14 @@ Item {
   }
   readonly property var ai: snap.ai || ({})
   readonly property var allSessions: ai.sessions || []
+  readonly property var think: ai.think || ({})
+  readonly property bool thinkBoardMode: Number(think.groupCount || 0) > 1 && thinkFilter === ""
   readonly property var projects: ai.projects || []
-  readonly property var sessions: !projectFilter ? allSessions : allSessions.filter(function(item) { return projectMatches(item) })
+  readonly property var sessions: {
+    var list = !projectFilter ? allSessions : allSessions.filter(function(item) { return projectMatches(item) })
+    if (thinkFilter) list = list.filter(function(item) { return thinkPidMatches(item) })
+    return list
+  }
   readonly property var activeNotificationProviders: {
     var result = []
     for (var i = 0; i < allSessions.length; i++) {
@@ -246,6 +253,40 @@ Item {
     // History rows carry the agent's cwd, which may be a subdirectory of the
     // repository the filter was set from.
     return key === projectFilter || key.indexOf(projectFilter + "/") === 0
+  }
+  function thinkGroupById(id) {
+    var want = String(id || ""), lanes = think.lanes || []
+    for (var i = 0; i < lanes.length; i++) {
+      var groups = lanes[i].groups || []
+      for (var j = 0; j < groups.length; j++) if (String(groups[j].id) === want) return groups[j]
+    }
+    return null
+  }
+  function thinkPidMatches(item) {
+    var group = thinkGroupById(thinkFilter)
+    if (!group) return false
+    var pids = group.pids || [], pid = Number(item && item.pid)
+    for (var i = 0; i < pids.length; i++) if (Number(pids[i]) === pid) return true
+    return false
+  }
+  function sessionThinkTone(item) {
+    var lanes = think.lanes || [], pid = Number(item && item.pid)
+    for (var i = 0; i < lanes.length; i++) {
+      var groups = lanes[i].groups || []
+      for (var j = 0; j < groups.length; j++) {
+        var pids = groups[j].pids || []
+        for (var k = 0; k < pids.length; k++) if (Number(pids[k]) === pid) return view.desk.roleColor(groups[j].tone)
+      }
+    }
+    return view.desk.providerColor(item && item.provider)
+  }
+  function toggleThinkFilter(id) {
+    var next = String(id || "")
+    thinkFilter = thinkFilter === next ? "" : next
+  }
+  readonly property string thinkFilterLabel: {
+    var group = thinkGroupById(thinkFilter)
+    return group && group.label ? group.label : thinkFilter
   }
   function projectTone(item) {
     return item.status === "blocked" ? view.desk.red : item.status === "running" ? view.desk.cyan : item.status === "behind" || item.status === "changed" ? view.desk.yellow : item.status === "unknown" ? view.textFaint : view.desk.green
@@ -854,6 +895,12 @@ Item {
           tone: view.desk.cyan
           MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: view.projectFilter = "" }
         }
+        Tag {
+          visible: view.thinkFilter !== ""
+          text: "THINK · " + view.thinkFilterLabel + " ×"
+          tone: view.desk.cyan
+          MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: view.thinkFilter = "" }
+        }
         // Discoverability, faint and in the strip: the two keys everyone needs.
         // On the wallpaper SUPER+D opens the desktop view; in that view it closes it.
         Tag { text: view.keyboardAvailable ? "SUPER+I HIDE DESK · SUPER+D / ESC CLOSE" : "SUPER+I HIDE DESK · SUPER+D SHOW OVER WINDOWS"; tone: view.textFaint }
@@ -885,9 +932,81 @@ Item {
           Layout.fillWidth: true
           visible: view.sectionEnabled("sessions")
           title: "LIVE AI SESSIONS"
-          hint: view.sessions.length + " running · left focus · right inspect" + (view.desk.error ? " · ⚠ " + view.desk.error : "")
+          hint: view.thinkBoardMode
+            ? (view.think.groupCount + " groups · click a row")
+            : (view.sessions.length + " running · left focus · right inspect" + (view.desk.error ? " · ⚠ " + view.desk.error : ""))
+          Item {
+            width: parent.width
+            implicitHeight: view.thinkBoardMode ? thinkBoard.implicitHeight : sessionFlow.implicitHeight
+          ColumnLayout {
+            id: thinkBoard
+            visible: view.thinkBoardMode
+            width: parent.width
+            spacing: Style.spacing.sm
+            Repeater {
+              model: view.think.lanes || []
+              delegate: ColumnLayout {
+                id: laneBox
+                required property var modelData
+                visible: (modelData.groups || []).length > 0
+                Layout.fillWidth: true
+                spacing: Style.spacing.xs
+                PlainText {
+                  text: String(laneBox.modelData.label || "")
+                  color: view.textFaint
+                  font.family: view.mono
+                  font.pixelSize: Style.font.caption
+                  font.bold: true
+                }
+                Repeater {
+                  model: laneBox.modelData.groups || []
+                  delegate: Rectangle {
+                    id: groupRow
+                    required property var modelData
+                    readonly property var group: modelData
+                    readonly property color tone: view.desk.roleColor(group.tone)
+                    Layout.fillWidth: true
+                    implicitHeight: groupLine.implicitHeight + Style.spacing.sm * 2
+                    radius: view.radius
+                    color: groupHover.containsMouse || view.thinkFilter === group.id ? Util.alpha(tone, 0.16) : Util.alpha(tone, 0.06)
+                    border.color: Util.alpha(tone, view.thinkFilter === group.id ? 0.85 : groupHover.containsMouse ? 0.7 : 0.35)
+                    border.width: view.thinkFilter === group.id ? 2 : 1
+                    RowLayout {
+                      id: groupLine
+                      anchors { fill: parent; leftMargin: Style.spacing.md; rightMargin: Style.spacing.md }
+                      spacing: Style.spacing.md
+                      Rectangle { width: 8; height: 8; radius: 4; color: groupRow.tone }
+                      PlainText {
+                        Layout.fillWidth: true
+                        text: String(groupRow.group.label || "")
+                        color: view.desk.themeForeground
+                        font.family: view.mono
+                        font.pixelSize: Style.font.body
+                        elide: Text.ElideRight
+                      }
+                      PlainText {
+                        text: groupRow.group.count + (groupRow.group.busy ? " · busy" : "") + (groupRow.group.attention ? " · needs you" : "")
+                        color: groupRow.group.attention ? view.desk.yellow : view.textDim
+                        font.family: view.mono
+                        font.pixelSize: Style.font.caption
+                      }
+                    }
+                    MouseArea {
+                      id: groupHover
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      enabled: view.interactive
+                      cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                      onClicked: view.toggleThinkFilter(groupRow.group.id)
+                    }
+                  }
+                }
+              }
+            }
+          }
           Flow {
             id: sessionFlow
+            visible: !view.thinkBoardMode
             width: parent.width
             spacing: Style.spacing.md
             // One row: four wide cards, or up to six narrower ones. Wrapping to a
@@ -913,12 +1032,12 @@ Item {
             readonly property int minimumCardWidth: Math.round((dense ? 112 : view.sessions.length > 4 ? 150 : 210) * Style.fontScale)
             readonly property int fittedCardWidth: Math.floor((width - spacing * (targetColumns - 1)) / targetColumns)
             Repeater {
-              model: view.sessions
+              model: view.thinkFilter && view.sessions.length > 8 ? view.sessions.slice(0, 8) : view.sessions
               delegate: Rectangle {
                 id: sc
                 required property var modelData
                 required property int index
-                readonly property color tone: view.desk.providerColor(modelData.provider)
+                readonly property color tone: view.sessionThinkTone(modelData)
                 // Prefer collector.busy (Grok's title sticks on 🧠 after the turn).
                 // Fall back to the title regex for snapshots from an older collector.
                 readonly property bool busy: modelData.busy === true || (modelData.busy !== false && modelData.window && /Processing|🧠|⚙|⏳|…/.test(String(modelData.window.title || "")))
@@ -995,6 +1114,14 @@ Item {
               }
             }
             PlainText {
+              visible: view.thinkFilter !== "" && view.sessions.length > 8
+              width: sessionFlow.width
+              text: "+" + (view.sessions.length - 8) + " more"
+              color: view.textFaint
+              font.family: view.mono
+              font.pixelSize: Style.font.caption
+            }
+            PlainText {
               visible: view.sessions.length === 0
               // Parent is a Flow: Layout.* is ignored there, so size explicitly or wrapMode never wraps.
               width: sessionFlow.width
@@ -1007,6 +1134,16 @@ Item {
               font.family: view.mono; font.pixelSize: Style.font.body
             }
           }
+          }
+        }
+
+        Loader {
+          id: archMapLoader
+          Layout.fillWidth: true
+          visible: view.sectionEnabled("arch") && status === Loader.Ready
+          active: view.sectionEnabled("arch")
+          source: "ArchMap.qml"
+          onStatusChanged: if (status === Loader.Error) console.warn("Arch desk: ArchMap.qml not available")
         }
 
         // ---- draggable operations intelligence ----
@@ -1299,6 +1436,15 @@ Item {
               onClearClicked: { view.githubCellFilter = -1; view.githubKindFilter = "" }
             }
           }
+        }
+
+        Loader {
+          id: githubReposLoader
+          Layout.fillWidth: true
+          visible: view.sectionEnabled("githubRepos") && status === Loader.Ready
+          active: view.sectionEnabled("githubRepos")
+          source: "GithubRepos.qml"
+          onStatusChanged: if (status === Loader.Error) console.warn("Arch desk: GithubRepos.qml not available")
         }
 
         // ---- recent prompts / task history ----
@@ -2044,7 +2190,7 @@ Item {
           PlainText {
             id: versionLabel
             visible: !!view.desk.version
-            text: "Infomarchy v" + view.desk.version + (view.interactive ? "  ·  ABOUT" : "")
+            text: "Arch desk v" + view.desk.version + (view.interactive ? "  ·  ABOUT" : "")
             color: aboutHover.containsMouse ? view.desk.themeForeground : view.textFaint
             font.family: view.mono; font.pixelSize: Style.font.caption
             MouseArea {

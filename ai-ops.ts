@@ -191,3 +191,196 @@ export function forecastPercent(percent: unknown, remainingMs: unknown, windowMs
   if (![used, remaining, duration].every(Number.isFinite) || used < 0 || remaining < 0 || duration <= 0 || elapsed < duration * 0.03) return null;
   return Math.max(0, used * duration / elapsed);
 }
+
+export const THINK_LANES = ["inbox", "product", "wiring", "machine", "other"] as const;
+export const THINK_TONES = ["green", "yellow", "red", "blue", "magenta", "cyan"] as const;
+export type ThinkTone = typeof THINK_TONES[number];
+export type ThinkLaneId = typeof THINK_LANES[number];
+export type ThinkGroup = {
+  id: string;
+  label: string;
+  org: string;
+  count: number;
+  busy: boolean;
+  attention: boolean;
+  pids: number[];
+  providers: string[];
+  tone: ThinkTone;
+};
+export type ThinkLane = { id: ThinkLaneId; label: string; count: number; groups: ThinkGroup[] };
+export type ThinkBoard = { sessionCount: number; groupCount: number; lanes: ThinkLane[] };
+
+const PROJECTS_ORGS: Record<string, ThinkLaneId> = {
+  "the-shit": "product",
+  "conduit-ui": "wiring",
+  "synapse-sentinel": "wiring",
+  jordanpartridge: "machine",
+};
+const KNOWN_BASENAMES: Record<string, { lane: ThinkLaneId; org: string; label: string }> = {
+  "prefrontal-cortex": { lane: "machine", org: "jordanpartridge", label: "prefrontal-cortex" },
+  lexi: { lane: "wiring", org: "synapse-sentinel", label: "lexi" },
+  cloudflare: { lane: "wiring", org: "", label: "cloudflare" },
+  "agent-bus": { lane: "wiring", org: "conduit-ui", label: "agent-bus" },
+  hive: { lane: "wiring", org: "jordanpartridge", label: "hive" },
+  music: { lane: "product", org: "the-shit", label: "music" },
+  kit: { lane: "product", org: "the-shit", label: "kit" },
+};
+const LANE_LABEL: Record<ThinkLaneId, string> = {
+  inbox: "INBOX", product: "PRODUCT", wiring: "WIRING", machine: "MACHINE", other: "OTHER",
+};
+
+function thinkNorm(value: unknown): string {
+  return String(value || "").toLowerCase().replace(/_/g, "-");
+}
+function thinkBasename(path: unknown): string {
+  const parts = String(path || "").replace(/\\/g, "/").replace(/\/+$/, "").split("/");
+  return parts.pop() || "";
+}
+function thinkTexts(session: any): string[] {
+  const hosts = Array.isArray(session?.hosts) ? session.hosts : [];
+  const out: string[] = [];
+  for (const value of [
+    session?.name, session?.project, session?.cwd, session?.repoRoot, session?.session,
+    session?.window?.title,
+    ...hosts.flatMap((host: any) => [host?.workspaceId, host?.workspace, host?.label, host?.session, host?.shell]),
+  ]) if (value) out.push(String(value));
+  return out;
+}
+function thinkTokens(session: any): string[] {
+  const tokens: string[] = [];
+  for (const text of thinkTexts(session))
+    for (const part of String(text).split(/[\/\s]+/)) if (part) tokens.push(part);
+  return tokens;
+}
+function thinkCrew(session: any): { slug: string; n: string } | null {
+  for (const token of thinkTokens(session)) {
+    const match = token.match(/^([A-Za-z0-9][A-Za-z0-9._-]*)-(\d+)-crew$/i);
+    if (match) return { slug: thinkNorm(match[1]), n: match[2] };
+  }
+  return null;
+}
+function thinkHostOps(session: any): boolean {
+  return thinkTokens(session).some(token => thinkNorm(token) === "asgard-host-ops-live")
+    || thinkTexts(session).some(text => /(^|[\/\s])asgard-host-ops-live(?=$|[\/\s])/i.test(text));
+}
+function thinkParentSlug(session: any): string {
+  for (const value of [session?.project, session?.name, thinkBasename(session?.cwd), thinkBasename(session?.repoRoot)]) {
+    const slug = thinkNorm(value);
+    if (slug && !/-\d+-crew$/.test(slug) && slug !== "asgard-host-ops-live") return slug;
+  }
+  return "";
+}
+function thinkPathGroup(session: any): { lane: ThinkLaneId; id: string; label: string; org: string } | null {
+  for (const text of thinkTexts(session)) {
+    const match = String(text).replace(/\\/g, "/").match(/(?:^|\/)Projects\/(the-shit|conduit-ui|synapse-sentinel|jordanpartridge)(?:\/([^/]+))?/i);
+    if (!match) continue;
+    const org = match[1].toLowerCase();
+    const repo = match[2] || org;
+    return { lane: PROJECTS_ORGS[org], id: thinkNorm(repo), label: repo, org };
+  }
+  return null;
+}
+function thinkKnownGroup(session: any): { lane: ThinkLaneId; id: string; label: string; org: string } | null {
+  for (const token of [...thinkTokens(session), thinkBasename(session?.cwd), thinkBasename(session?.repoRoot), String(session?.project || ""), String(session?.name || "")]) {
+    const known = KNOWN_BASENAMES[thinkNorm(token)];
+    if (known) return { lane: known.lane, id: thinkNorm(known.label), label: known.label, org: known.org };
+  }
+  return null;
+}
+function thinkOtherGroup(session: any): { lane: ThinkLaneId; id: string; label: string; org: string } {
+  const label = String(session?.project || thinkBasename(session?.cwd || session?.repoRoot) || "session") || "session";
+  return { lane: "other", id: thinkNorm(label) || `pid-${session?.pid || 0}`, label, org: "" };
+}
+export function groupTone(id: string): ThinkTone {
+  let hash = 2166136261;
+  for (let i = 0; i < id.length; i++) hash = Math.imul(hash ^ id.charCodeAt(i), 16777619);
+  return THINK_TONES[Math.abs(hash) % THINK_TONES.length];
+}
+
+export function thinkBoard(sessions: any[]): ThinkBoard {
+  const list = Array.isArray(sessions) ? sessions.filter(Boolean) : [];
+  const assigned = new Array(list.length).fill(false);
+  const rows: Array<{ index: number; lane: ThinkLaneId; id: string; label: string; org: string }> = [];
+  function take(index: number, lane: ThinkLaneId, id: string, label: string, org: string) {
+    assigned[index] = true;
+    rows.push({ index, lane, id, label, org });
+  }
+
+  const crews = new Map<string, { slug: string; n: string }>();
+  for (let i = 0; i < list.length; i++) {
+    const crew = thinkCrew(list[i]);
+    if (!crew) continue;
+    const id = `asgard-${crew.n}`;
+    crews.set(id, crew);
+    take(i, "inbox", id, `Asgard #${crew.n}`, "jordanpartridge");
+  }
+  for (let i = 0; i < list.length; i++) {
+    if (!assigned[i] && thinkHostOps(list[i])) take(i, "inbox", "asgard-host-ops-live", "host-ops live", "jordanpartridge");
+  }
+  const crewIdsBySlug = new Map<string, string[]>();
+  for (const [id, crew] of crews) {
+    const ids = crewIdsBySlug.get(crew.slug) || [];
+    if (!ids.includes(id)) ids.push(id);
+    crewIdsBySlug.set(crew.slug, ids);
+  }
+  for (let i = 0; i < list.length; i++) {
+    if (assigned[i]) continue;
+    const slug = thinkParentSlug(list[i]);
+    const ids = slug ? crewIdsBySlug.get(slug) || [] : [];
+    if (!ids.length) continue;
+    let id = ids.length === 1 ? ids[0] : "";
+    if (!id) {
+      const blob = thinkTexts(list[i]).join(" ");
+      id = ids.find(entry => blob.includes(entry.slice("asgard-".length))) || "";
+    }
+    if (id) take(i, "inbox", id, `Asgard #${id.slice("asgard-".length)}`, "jordanpartridge");
+  }
+  for (let i = 0; i < list.length; i++) {
+    if (assigned[i]) continue;
+    const fromPath = thinkPathGroup(list[i]);
+    if (fromPath) { take(i, fromPath.lane, fromPath.id, fromPath.label, fromPath.org); continue; }
+    const known = thinkKnownGroup(list[i]);
+    if (known) { take(i, known.lane, known.id, known.label, known.org); continue; }
+    const other = thinkOtherGroup(list[i]);
+    take(i, other.lane, other.id, other.label, other.org);
+  }
+
+  const buckets = new Map<string, { lane: ThinkLaneId; id: string; label: string; org: string; sessions: any[] }>();
+  for (const row of rows) {
+    const key = `${row.lane}\0${row.id}`;
+    const bucket = buckets.get(key) || { lane: row.lane, id: row.id, label: row.label, org: row.org, sessions: [] };
+    bucket.sessions.push(list[row.index]);
+    buckets.set(key, bucket);
+  }
+
+  const lanes: ThinkLane[] = [];
+  for (const laneId of THINK_LANES) {
+    const groups = [...buckets.values()].filter(bucket => bucket.lane === laneId).map(bucket => {
+      const pids: number[] = [], providers: string[] = [];
+      for (const session of bucket.sessions) {
+        const pid = Number(session?.pid);
+        if (Number.isFinite(pid) && !pids.includes(pid)) pids.push(pid);
+        const provider = String(session?.provider || "");
+        if (provider && !providers.includes(provider)) providers.push(provider);
+      }
+      return {
+        id: bucket.id, label: bucket.label, org: bucket.org, count: bucket.sessions.length,
+        busy: bucket.sessions.some(session => session?.busy === true),
+        attention: bucket.sessions.some(session => !!session?.attention),
+        pids, providers, tone: groupTone(bucket.id),
+      } satisfies ThinkGroup;
+    });
+    groups.sort((a, b) => {
+      if (laneId === "inbox") {
+        const an = Number(a.id.replace(/^asgard-/, "")), bn = Number(b.id.replace(/^asgard-/, ""));
+        if (Number.isFinite(an) && Number.isFinite(bn) && an !== bn) return bn - an;
+      }
+      return a.label.localeCompare(b.label) || a.id.localeCompare(b.id);
+    });
+    if (groups.length) lanes.push({
+      id: laneId, label: LANE_LABEL[laneId],
+      count: groups.reduce((sum, group) => sum + group.count, 0), groups,
+    });
+  }
+  return { sessionCount: list.length, groupCount: lanes.reduce((sum, lane) => sum + lane.groups.length, 0), lanes };
+}

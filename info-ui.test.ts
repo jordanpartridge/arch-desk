@@ -99,7 +99,7 @@ describe("interactive information modules", () => {
     expect(view).not.toContain('"QUIET 22–08 "');
     expect(service).toContain('"omarchy-notification-send"');
     expect(service).toContain("dashboardSettings.claimNotificationEvent");
-    expect(service).toContain('"nixfred.infomarchy", "{}"');
+    expect(service).toContain('"jordan.arch-desk", "{}"');
   });
 });
 
@@ -332,11 +332,11 @@ describe("right column fits a 1080p desk", () => {
     // An in-place plugin update rewrites manifest.json under a running shell.
     expect(model).toContain("watchChanges: true");
     expect(model).toContain("onFileChanged: reload()");
-    expect(model).toContain('readonly property string repoUrl: "https://github.com/nixfred/infomarchy"');
+    expect(model).toContain('readonly property string repoUrl: "https://github.com/jordanpartridge/arch-desk"');
     expect(model).toContain('readonly property string authorUrl: "https://nixfred.com"');
 
     // The version is on the desk itself, at the quiet end of the legend line.
-    expect(view).toContain('text: "Infomarchy v" + view.desk.version');
+    expect(view).toContain('text: "Arch desk v" + view.desk.version');
     expect(view).toContain("onClicked: view.aboutOpen = true");
 
     // All three required entries appear in the panel.
@@ -352,7 +352,7 @@ describe("right column fits a 1080p desk", () => {
     const source = model.match(/function openUrl\(url\) \{[\s\S]*?\n  \}/)?.[0];
     expect(source).toBeTruthy();
     const calls: string[][] = [];
-    const root = { repoUrl: "https://github.com/nixfred/infomarchy", authorUrl: "https://nixfred.com" };
+    const root = { repoUrl: "https://github.com/jordanpartridge/arch-desk", authorUrl: "https://nixfred.com" };
     const Quickshell = { execDetached: (argv: string[]) => { calls.push(argv); } };
     const openUrl = Function("root", "Quickshell", `return (${source})`)(root, Quickshell);
 
@@ -440,12 +440,36 @@ describe("recent tasks keep quieter providers", () => {
   });
 });
 
+describe("think board", () => {
+  test("groups sessions when think.groupCount > 1 and filters by thinkFilter pids", () => {
+    expect(settings).toContain('{ id: "arch", label: "ARCH" }');
+    expect(settings).toContain('{ id: "githubRepos", label: "REPOS" }');
+    expect(view).toContain("property string thinkFilter");
+    expect(view).toContain("readonly property bool thinkBoardMode: Number(think.groupCount || 0) > 1 && thinkFilter === \"\"");
+    expect(view).toContain("function toggleThinkFilter");
+    expect(view).toContain("view.toggleThinkFilter(groupRow.group.id)");
+    expect(view).toContain("onClicked: view.thinkFilter = \"\"");
+    expect(view).toContain("visible: view.thinkBoardMode");
+    expect(view).toContain("visible: !view.thinkBoardMode");
+    expect(view).toContain("view.thinkFilter && view.sessions.length > 8 ? view.sessions.slice(0, 8) : view.sessions");
+    expect(view).toContain('text: "+" + (view.sessions.length - 8) + " more"');
+    expect(view).toContain("readonly property color tone: view.sessionThinkTone(modelData)");
+    expect(model).toContain("function roleColor(role)");
+    expect(view).toContain('source: "ArchMap.qml"');
+    expect(view).toContain('source: "GithubRepos.qml"');
+    expect(view).toContain("if (status === Loader.Error) console.warn(\"Arch desk: ArchMap.qml not available\")");
+    expect(view).toContain("if (status === Loader.Error) console.warn(\"Arch desk: GithubRepos.qml not available\")");
+  });
+});
+
 describe("github activity heatmap", () => {
   test("registers GITHUB as a removable module beside ACTIVITY and reaches it from the keyboard", () => {
     const ids = [...settings.matchAll(/\{ id: "([a-zA-Z]+)", label: "[^"]+" \}/g)].map(match => match[1]);
     expect(ids.indexOf("github")).toBe(ids.indexOf("activity") + 1);
-    expect(ids).toHaveLength(11);
+    expect(ids).toHaveLength(13);
     expect(ids[10]).toBe("media");
+    expect(ids[11]).toBe("arch");
+    expect(ids[12]).toBe("githubRepos");
     expect(overlay).toContain("event.key >= Qt.Key_0 && event.key <= Qt.Key_9");
     expect(overlay).toContain("event.key === Qt.Key_0 ? 9 : event.key - Qt.Key_1");
     // Key n toggles definitions[n-1]; 0 is the tenth. Documented as 4 = GITHUB, 0 = PROJECTS.

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { attentionSignal, attentionState, parseCommitSummary, parseDiffNumstat, parseGitStatus, projectHealth, repoCollisions, workspaceGroups, resourceDelta, forecastPercent, usageWindowMs, limitForecast } from "./ai-ops";
+import { attentionSignal, attentionState, parseCommitSummary, parseDiffNumstat, parseGitStatus, projectHealth, repoCollisions, workspaceGroups, resourceDelta, forecastPercent, usageWindowMs, limitForecast, thinkBoard, groupTone, THINK_TONES, THINK_LANES } from "./ai-ops";
 
 describe("AI operations signals", () => {
   test("parses branch readiness and conflicts", () => {
@@ -116,5 +116,115 @@ describe("project health honesty", () => {
     expect(project.status).toBe("unknown");
     const [clean] = projectHealth([{ provider: "claude", pid: 1, cwd: "~/y", repoRoot: "~/y", git: { dirty: 0, behind: 0, conflicts: 0 }, ci: null, project: "y" }]);
     expect(clean.status).toBe("healthy");
+  });
+});
+
+describe("think board", () => {
+  test("empty input is an empty board", () => {
+    expect(thinkBoard([])).toEqual({ sessionCount: 0, groupCount: 0, lanes: [] });
+    expect(thinkBoard(null as any)).toEqual({ sessionCount: 0, groupCount: 0, lanes: [] });
+  });
+
+  test("name-123-crew is Asgard #123 and a matching parent joins", () => {
+    const board = thinkBoard([
+      { pid: 11, provider: "grok", project: "asgard-123-crew", cwd: "~/Work/die/asgard-123-crew", busy: true },
+      { pid: 12, provider: "claude", project: "Asgard", cwd: "~/Projects/jordanpartridge/Asgard", name: "asgard", attention: "waiting" },
+    ]);
+    expect(board).toMatchObject({ sessionCount: 2, groupCount: 1 });
+    expect(board.lanes.map(lane => lane.id)).toEqual(["inbox"]);
+    expect(board.lanes[0].groups).toEqual([expect.objectContaining({
+      id: "asgard-123", label: "Asgard #123", org: "jordanpartridge", count: 2,
+      busy: true, attention: true, pids: [11, 12], providers: ["grok", "claude"],
+    })]);
+    expect(THINK_TONES).toContain(board.lanes[0].groups[0].tone);
+  });
+
+  test("asgard-host-ops-live is inbox, not the machine org path", () => {
+    const board = thinkBoard([
+      { pid: 7, provider: "grok", name: "asgard-host-ops-live", cwd: "~/Projects/jordanpartridge/Asgard", project: "Asgard" },
+    ]);
+    expect(board.lanes).toEqual([expect.objectContaining({
+      id: "inbox",
+      groups: [expect.objectContaining({ id: "asgard-host-ops-live", label: "host-ops live", org: "jordanpartridge", count: 1, pids: [7] })],
+    })]);
+  });
+
+  test("~/Projects/<org>/... maps product, wiring, and machine", () => {
+    const board = thinkBoard([
+      { pid: 1, provider: "grok", cwd: "~/Projects/the-shit/kit", project: "kit" },
+      { pid: 2, provider: "claude", cwd: "~/Projects/conduit-ui/core", project: "core" },
+      { pid: 3, provider: "codex", cwd: "~/Projects/synapse-sentinel/lexi", project: "lexi" },
+      { pid: 4, provider: "opencode", cwd: "~/Projects/jordanpartridge/omarchy-riceThor", project: "omarchy-riceThor" },
+    ]);
+    expect(board.lanes.map(lane => lane.id)).toEqual(["product", "wiring", "machine"]);
+    expect(board.lanes.find(lane => lane.id === "product")?.groups.map(g => g.id)).toEqual(["kit"]);
+    expect(board.lanes.find(lane => lane.id === "wiring")?.groups.map(g => [g.id, g.org]).sort()).toEqual([
+      ["core", "conduit-ui"], ["lexi", "synapse-sentinel"],
+    ].sort());
+    expect(board.lanes.find(lane => lane.id === "machine")?.groups[0]).toMatchObject({
+      id: "omarchy-ricethor", org: "jordanpartridge", label: "omarchy-riceThor",
+    });
+  });
+
+  test("known basenames land even without a Projects path", () => {
+    const board = thinkBoard([
+      { pid: 1, provider: "grok", project: "prefrontal-cortex", cwd: "~/Work/prefrontal-cortex" },
+      { pid: 2, provider: "claude", project: "lexi", cwd: "~/code/lexi" },
+      { pid: 3, provider: "codex", project: "cloudflare", cwd: "~/tmp/cloudflare" },
+      { pid: 4, provider: "grok", project: "agent-bus", cwd: "~/tmp/agent-bus" },
+      { pid: 5, provider: "grok", project: "hive", cwd: "~/tmp/hive" },
+      { pid: 6, provider: "claude", project: "music", cwd: "~/tmp/music" },
+      { pid: 7, provider: "codex", project: "kit", cwd: "~/tmp/kit" },
+    ]);
+    const byId = Object.fromEntries(board.lanes.flatMap(lane => lane.groups.map(g => [g.id, { lane: lane.id, org: g.org }])));
+    expect(byId["prefrontal-cortex"]).toEqual({ lane: "machine", org: "jordanpartridge" });
+    expect(byId.lexi).toEqual({ lane: "wiring", org: "synapse-sentinel" });
+    expect(byId.cloudflare).toEqual({ lane: "wiring", org: "" });
+    expect(byId["agent-bus"]).toEqual({ lane: "wiring", org: "conduit-ui" });
+    expect(byId.hive).toEqual({ lane: "wiring", org: "jordanpartridge" });
+    expect(byId.music).toEqual({ lane: "product", org: "the-shit" });
+    expect(byId.kit).toEqual({ lane: "product", org: "the-shit" });
+    expect(board.lanes.map(lane => lane.id)).toEqual(["product", "wiring", "machine"]);
+  });
+
+  test("unknown projects sit in other, and crew wins over a Projects path", () => {
+    const board = thinkBoard([
+      { pid: 1, provider: "grok", project: "atlas", cwd: "~/Code/atlas" },
+      { pid: 2, provider: "claude", project: "asgard-99-crew", cwd: "~/Projects/jordanpartridge/Asgard" },
+    ]);
+    expect(board.lanes.map(lane => lane.id)).toEqual(["inbox", "other"]);
+    expect(board.lanes[0].groups[0]).toMatchObject({ id: "asgard-99", label: "Asgard #99" });
+    expect(board.lanes[1].groups[0]).toMatchObject({ id: "atlas", label: "atlas", org: "" });
+  });
+
+  test("group tone is a stable hash of group id, not the provider", () => {
+    const a = thinkBoard([{ pid: 1, provider: "claude", project: "lexi", cwd: "~/code/lexi" }]);
+    const b = thinkBoard([{ pid: 2, provider: "grok", project: "lexi", cwd: "~/code/lexi" }]);
+    expect(a.lanes[0].groups[0].tone).toBe(b.lanes[0].groups[0].tone);
+    expect(a.lanes[0].groups[0].tone).toBe(groupTone("lexi"));
+    expect(THINK_TONES).toContain(a.lanes[0].groups[0].tone);
+    expect(groupTone("lexi")).toBe(groupTone("lexi"));
+  });
+
+  test("lanes stay in house order and a parent does not join two crews", () => {
+    expect([...THINK_LANES]).toEqual(["inbox", "product", "wiring", "machine", "other"]);
+    const board = thinkBoard([
+      { pid: 1, provider: "grok", project: "asgard-10-crew", cwd: "~/Work/die/asgard-10-crew" },
+      { pid: 2, provider: "grok", project: "asgard-20-crew", cwd: "~/Work/die/asgard-20-crew" },
+      { pid: 3, provider: "claude", project: "Asgard", cwd: "~/Projects/jordanpartridge/Asgard" },
+      { pid: 4, provider: "codex", project: "kit", cwd: "~/Projects/the-shit/kit" },
+    ]);
+    expect(board.lanes.map(lane => lane.id)).toEqual(["inbox", "product", "machine"]);
+    expect(board.lanes[0].groups.map(g => g.id)).toEqual(["asgard-20", "asgard-10"]);
+    expect(board.lanes.find(lane => lane.id === "machine")?.groups[0]).toMatchObject({ id: "asgard", count: 1, pids: [3] });
+    expect(board.groupCount).toBe(4);
+  });
+
+  test("herdr workspace tokens classify a crew", () => {
+    const board = thinkBoard([{
+      pid: 8, provider: "grok", project: "die", cwd: "~/Work/die",
+      hosts: [{ kind: "herdr", workspaceId: "arch-desk-260-crew", label: "Herdr arch-desk-260-crew" }],
+    }]);
+    expect(board.lanes[0].groups[0]).toMatchObject({ id: "asgard-260", label: "Asgard #260", pids: [8] });
   });
 });

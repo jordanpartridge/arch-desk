@@ -15,7 +15,7 @@ Item {
   property bool ready: false
   property string error: ""
   // Resolve the script itself so a missing trailing slash on a directory URL
-  // cannot produce ".../nixfred.infomarchicollector.ts".
+  // cannot produce ".../jordan.arch-deskcollector.ts".
   property string collectorPath: Qt.resolvedUrl("collector.ts").toString().replace(/^file:\/\//, "")
   property string resumePath: Qt.resolvedUrl("resume-session.ts").toString().replace(/^file:\/\//, "")
   property string sessionActionsPath: Qt.resolvedUrl("session-actions.ts").toString().replace(/^file:\/\//, "")
@@ -27,7 +27,7 @@ Item {
   // Read from manifest.json so the About panel can never drift from the
   // version the plugin actually ships as.
   property string version: ""
-  readonly property string repoUrl: "https://github.com/nixfred/infomarchy"
+  readonly property string repoUrl: "https://github.com/jordanpartridge/arch-desk"
   readonly property string authorUrl: "https://nixfred.com"
   property bool ollamaBusy: false
   property string ollamaStatus: ""
@@ -132,6 +132,17 @@ Item {
       case "pi": return root.green
       case "aider": return root.yellow
       case "copilot": return root.magenta
+      default: return Color.accent
+    }
+  }
+  function roleColor(role) {
+    switch (String(role || "")) {
+      case "green": return root.green
+      case "yellow": return root.yellow
+      case "red": return root.red
+      case "blue": return root.blue
+      case "magenta": return root.magenta
+      case "cyan": return root.cyan
       default: return Color.accent
     }
   }

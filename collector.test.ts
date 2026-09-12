@@ -1322,3 +1322,24 @@ describe("zombie detection", () => {
     expect(sessionStaleness({ startedAt: 7000, topicAt: 0, hosts: [], window: null }, now).idleSince).toBe(7000);
   });
 });
+
+describe("think board snapshot", () => {
+  test("live and demo snapshots both emit thinkBoard(sessions)", () => {
+    const source = readFileSync(join(import.meta.dir, "collector.ts"), "utf8");
+    expect(source.match(/think:\s*thinkBoard\(sessions\)/g)?.length).toBe(2);
+  });
+
+  test("demo snapshot includes a grouped think board", async () => {
+    const proc = Bun.spawn(["bun", join(import.meta.dir, "collector.ts"), "--demo", "--id", "think"], {
+      stdout: "pipe", stderr: "ignore",
+      env: { HOME: join(testRoot, "think-demo-home"), USER: "tester", PATH: process.env.PATH || "", INFOMARCHY_SKIP_EXTERNAL_IP: "1", INFOMARCHY_SKIP_GITHUB: "1" },
+    });
+    const output = await new Response(proc.stdout).text();
+    expect(await proc.exited).toBe(0);
+    const snap = decodeFrames(output);
+    expect(snap.ai.think.sessionCount).toBe(snap.ai.sessions.length);
+    expect(snap.ai.think.groupCount).toBeGreaterThan(1);
+    expect(snap.ai.think.lanes.map((lane: any) => lane.id)).toEqual(["inbox", "product", "wiring"]);
+    expect(snap.ai.think.lanes[0].groups[0]).toMatchObject({ id: "asgard-260", label: "Asgard #260" });
+  });
+});

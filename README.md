@@ -1,7 +1,7 @@
-<h1 align="center">Infomarchy</h1>
+<h1 align="center">Arch desk</h1>
 
 <p align="center">
-  <b>Your wallpaper, promoted to information desk.</b><br>
+  <b>Fork of Infomarchy. Plugin id <code>jordan.arch-desk</code>. Sessions grouped by project, not 51 provider cards.</b><br>
   Every AI agent running on your machine, what it's doing, what it cost you, and how the box is holding up —<br>
   drawn live on the Omarchy desktop in your current theme, one glance away, one click to jump in.
 </p>
@@ -146,7 +146,7 @@ The module strip doubles as a keyboard command strip in the overlay: **1–9** t
 
 ```bash
 sudo pacman -S --needed bun   # the collector runs on bun; Omarchy does not ship it
-omarchy plugin add https://github.com/nixfred/infomarchy.git --enable --yes
+omarchy plugin add https://github.com/jordanpartridge/arch-desk.git --enable --yes
 omarchy restart shell    # first time only: services load at shell start
 ```
 
@@ -157,7 +157,7 @@ The plugin declares itself as a clone of `omarchy.background`, so Omarchy hands 
 Bind the fullscreen overlay and wallpaper-dashboard toggle in `~/.config/hypr/bindings.lua` (pick any free chords):
 
 ```lua
-o.bind("SUPER + D", "Infomarchy: AI info desk", "omarchy-shell shell toggle nixfred.infomarchy '{}'")
+o.bind("SUPER + D", "Arch desk: AI info desk", "omarchy-shell shell toggle jordan.arch-desk '{}'")
 -- Hide the cards to see the plain desktop; press again to restore them.
 o.bind("SUPER + I", "Infomarchy: toggle wallpaper dashboard", "omarchy-shell infomarchy toggleDashboard")
 ```
@@ -166,9 +166,9 @@ o.bind("SUPER + I", "Infomarchy: toggle wallpaper dashboard", "omarchy-shell inf
 <summary>Manual install</summary>
 
 ```bash
-git clone https://github.com/nixfred/infomarchy.git ~/.config/omarchy/plugins/nixfred.infomarchy
+git clone https://github.com/jordanpartridge/arch-desk.git ~/.config/omarchy/plugins/jordan.arch-desk
 omarchy-shell shell rescanPlugins
-omarchy plugin enable nixfred.infomarchy
+omarchy plugin enable jordan.arch-desk
 omarchy restart shell
 ```
 </details>
@@ -178,7 +178,7 @@ omarchy restart shell
 Remove Infomarchy and return to the stock wallpaper service with:
 
 ```bash
-omarchy plugin remove nixfred.infomarchy --yes
+omarchy plugin remove jordan.arch-desk --yes
 omarchy restart shell
 ```
 
@@ -228,7 +228,7 @@ No usernames, hostnames or absolute paths are hardcoded anywhere. The collector 
 
 ```bash
 omarchy-shell infomarchy refresh                                      # wallpaper collector now
-omarchy-shell shell call nixfred.infomarchy refresh                   # overlay collector (only while summoned)
+omarchy-shell shell call jordan.arch-desk refresh                     # overlay collector (only while summoned)
 omarchy-shell infomarchy setWallpaperOpacity 0.5                      # 0 = solid theme bg
 omarchy-shell infomarchy toggleDashboard                              # hide/show cards; keep wallpaper
 omarchy-shell infomarchy setDashboardVisible true                     # explicit on/off control
@@ -272,7 +272,7 @@ Pi sessions are detected from the `pi` process and `~/.pi/agent/sessions` JSONL 
 
 **Clicking a card doesn't focus anything.** The card says *no window* — the agent isn't under a Hyprland client (SSH session, systemd service, or started from a launcher that already exited). That's expected.
 
-**Can I keep the stock wallpaper behaviour too?** Yes: disable `nixfred.infomarchy` and Omarchy restores `omarchy.background`. Or keep it enabled and set `wallpaperOpacity` to taste.
+**Can I keep the stock wallpaper behaviour too?** Yes: disable `jordan.arch-desk` and Omarchy restores `omarchy.background`. Or keep it enabled and set `wallpaperOpacity` to taste.
 
 **Two monitors?** One desk per screen, each sized to its own resolution.
 

@@ -93,7 +93,7 @@ export function validGithubLogin(value: unknown): string {
 }
 // owner/name as GitHub allows them; "." and ".." segments are never a repo
 // and must never reach a path or a query.
-function validRepo(value: unknown): string {
+export function validRepo(value: unknown): string {
   if (typeof value !== "string") return "";
   const repo = value.trim();
   const match = /^([A-Za-z0-9](?:[A-Za-z0-9-]{0,38}))\/([A-Za-z0-9_.-]{1,100})$/.exec(repo);

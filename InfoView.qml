@@ -1301,6 +1301,16 @@ Item {
           }
         }
 
+        Loader {
+          id: githubReposLoader
+          Layout.fillWidth: true
+          active: view.sectionEnabled("githubRepos")
+          visible: active && status === Loader.Ready
+          source: "GithubRepos.qml"
+          Layout.preferredHeight: item ? item.implicitHeight : 0
+          onLoaded: if (item) item.host = view
+        }
+
         // ---- recent prompts / task history ----
         Card {
           Layout.fillWidth: true

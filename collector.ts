@@ -17,6 +17,7 @@ import { localDayIndex, localDayStarts } from "./history-time";
 import { githubFetchEnabled, githubRefreshDue, githubRepoFromRemote, githubSnapshot, parseGithubStoreText, refreshGithubActivity } from "./github-activity";
 import { attentionSignal, parseCommitSummary, parseDiffNumstat, parseGitStatus, projectHealth, repoCollisions, workspaceGroups, resourceDelta, limitForecast } from "./ai-ops";
 import { deriveNotificationEvents } from "./notification-events";
+import { archMap } from "./arch-map";
 
 const HOME = process.env.HOME || "/root";
 const XDG_STATE = process.env.XDG_STATE_HOME || join(HOME, ".local/state");
@@ -2428,7 +2429,7 @@ function demoSnapshot(stamp = Date.now()) {
       temp: 52, uptime: 186_300, externalIp: "203.0.113.42",
     },
     ai: {
-      sessions, projects: projectHealth(sessions), workspaces: workspaceGroups(sessions), attention: [sessions[1]], collisions: [],
+      sessions, projects: projectHealth(sessions), workspaces: workspaceGroups(sessions), attention: [sessions[1]], collisions: [], arch: archMap(sessions),
       counts: { claude: { today: 18, week: 96, total: 640 }, codex: { today: 27, week: 144, total: 1102 }, opencode: { today: 11, week: 51, total: 214 } },
       providers: {
         claude: { present: true, prompts: 640 }, codex: { present: true, prompts: 1102, threadCount: 37 },
@@ -2488,6 +2489,7 @@ async function runCollector() {
       sessions,
       projects: projectHealth(sessions),
       workspaces: workspaceGroups(sessions),
+      arch: archMap(sessions),
       attention: sessions.filter((s: any) => s.attention),
       events: notificationState.events,
       collisions: repoCollisions(sessions),

@@ -23,11 +23,12 @@ import { join } from "path";
 // reference moves the count, which is exactly what a bad merge introduces.
 // Verified — the same injection took InfoModel from 5 to 6.
 const CEILINGS: Record<string, number> = {
+  "ArchMap.qml": 25,
   "BackgroundWallpaper.qml": 2,
-  "Infomarchy.qml": 26,
+  "Infomarchy.qml": 28,
   "InfoModel.qml": 5,
   "InfoSettings.qml": 0,
-  "InfoView.qml": 473,
+  "InfoView.qml": 475,
   "Overlay.qml": 29,
   "WaveWallpaper.qml": 0,
 };

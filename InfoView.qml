@@ -880,6 +880,21 @@ Item {
         Layout.maximumWidth: view.width - view.rightColumnWidth - view.gap * 5
         spacing: view.gap
 
+        // ARCH map (Asgard#260). Do not rewrite LIVE AI SESSIONS.
+        Loader {
+          Layout.fillWidth: true
+          Layout.preferredHeight: item ? item.implicitHeight : Math.round(180 * Style.fontScale)
+          visible: view.sectionEnabled("arch")
+          active: visible
+          source: Qt.resolvedUrl("ArchMap.qml")
+          onLoaded: {
+            item.desk = view.desk
+            item.arch = Qt.binding(function() { return view.ai.arch || ({}) })
+            item.thinkFilter = Qt.binding(function() { return view.projectFilter })
+            item.nodeClicked.connect(function(id) { view.projectFilter = view.projectFilter === id ? "" : id })
+          }
+        }
+
         // ---- live sessions ----
         Card {
           Layout.fillWidth: true

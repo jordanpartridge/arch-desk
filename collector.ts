@@ -15,6 +15,7 @@ import { isIP } from "net";
 import { Database } from "bun:sqlite";
 import { localDayIndex, localDayStarts } from "./history-time";
 import { githubFetchEnabled, githubRefreshDue, githubRepoFromRemote, githubSnapshot, parseGithubStoreText, refreshGithubActivity } from "./github-activity";
+import { githubReposFromStore } from "./github-repos";
 import { attentionSignal, parseCommitSummary, parseDiffNumstat, parseGitStatus, projectHealth, repoCollisions, workspaceGroups, resourceDelta, limitForecast } from "./ai-ops";
 import { deriveNotificationEvents } from "./notification-events";
 
@@ -2444,7 +2445,13 @@ function demoSnapshot(stamp = Date.now()) {
         claude: { name: "Claude", ready: true, tierLabel: "Max", todayPrompts: 18, todayTotalTokens: 184_000, limits: [{ label: "SESSION", percent: 0.46, resetsAt: new Date(stamp + 2.1 * 3600_000).toISOString() }, { label: "WEEKLY", percent: 0.61, resetsAt: new Date(stamp + 3.4 * 86400_000).toISOString() }] },
         codex: { name: "Codex", ready: true, tierLabel: "Pro", todayPrompts: 27, todayTotalTokens: 311_000, limits: [{ label: "5-HOUR", percent: 0.38, resetsAt: new Date(stamp + 3.2 * 3600_000).toISOString() }, { label: "7-DAY", percent: 0.54, resetsAt: new Date(stamp + 4.2 * 86400_000).toISOString() }] },
       },
-      heatmap: { start: dayStarts[0], days: dayStarts, cells }, github, recent, recentTruncated: false,
+      heatmap: { start: dayStarts[0], days: dayStarts, cells }, github,
+      githubRepos: { repos: [
+        { name: "atlas", commits7: 18, prs7: 3, points: [2, 3, 1, 4, 5, 3, 3] },
+        { name: "orbit", commits7: 9, prs7: 1, points: [1, 0, 2, 1, 2, 2, 2] },
+        { name: "beacon", commits7: 6, prs7: 2, points: [0, 1, 1, 0, 2, 2, 2] },
+      ] },
+      recent, recentTruncated: false,
     },
   };
 }
@@ -2495,6 +2502,7 @@ async function runCollector() {
       usageDays: heatDays.map(localDayKey),
       heatmap: { start: start7, days: heatDays, cells: heat.map(c => [c.n, c.p]) },
       github,
+      githubRepos: githubReposFromStore(parseGithubStoreText(read(GITHUB_FILE)), heatDays),
       recent: dashboardRecent, recentTruncated,
     },
   };

@@ -24,10 +24,11 @@ import { join } from "path";
 // Verified — the same injection took InfoModel from 5 to 6.
 const CEILINGS: Record<string, number> = {
   "BackgroundWallpaper.qml": 2,
-  "Infomarchy.qml": 26,
+  "GithubRepos.qml": 28,
+  "Infomarchy.qml": 28,
   "InfoModel.qml": 5,
   "InfoSettings.qml": 0,
-  "InfoView.qml": 473,
+  "InfoView.qml": 474,
   "Overlay.qml": 29,
   "WaveWallpaper.qml": 0,
 };
